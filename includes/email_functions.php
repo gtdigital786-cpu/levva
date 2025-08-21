@@ -71,12 +71,16 @@ function send_email($to_email, $subject, $body, $attachment_path = null, $attach
     } catch (Exception $e) {
         // Log error
         if (isset($email_log_id)) {
-            $stmt = $pdo->prepare("
-                UPDATE email_logs 
-                SET status = 'FAILED', response_data = ? 
-                WHERE id = ?
-            ");
-            $stmt->execute(['Error: ' . $e->getMessage(), $email_log_id]);
+            try {
+                $stmt = $pdo->prepare("
+                    UPDATE email_logs 
+                    SET status = 'FAILED', response_data = ? 
+                    WHERE id = ?
+                ");
+                $stmt->execute(['Error: ' . $e->getMessage(), $email_log_id]);
+            } catch (Exception $log_e) {
+                error_log("Failed to log email error: " . $log_e->getMessage());
+            }
         }
         
         return [
@@ -102,16 +106,18 @@ function send_email_phpmailer($to_email, $subject, $body, $attachment_path, $att
         
         // Handle encryption settings
         $smtp_encryption = $settings['smtp_encryption'] ?? 'tls';
+        $smtp_port = intval($settings['smtp_port'] ?? 587);
+        
         if ($smtp_encryption === 'ssl') {
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-            $mail->Port = $settings['smtp_port'] ?? 465;
+            $mail->Port = $smtp_port ?: 465;
         } elseif ($smtp_encryption === 'tls') {
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port = $settings['smtp_port'] ?? 587;
+            $mail->Port = $smtp_port ?: 587;
         } else {
             $mail->SMTPSecure = false;
-            $mail->SMTPAuth = true; // Keep auth enabled even without encryption
-            $mail->Port = $settings['smtp_port'] ?? 25;
+            $mail->SMTPAuth = true;
+            $mail->Port = $smtp_port ?: 25;
         }
         
         // Additional settings for better compatibility
@@ -125,6 +131,10 @@ function send_email_phpmailer($to_email, $subject, $body, $attachment_path, $att
         
         // Set timeout
         $mail->Timeout = 30;
+        $mail->SMTPKeepAlive = false;
+        
+        // Enable debug output for troubleshooting (disable in production)
+        // $mail->SMTPDebug = SMTP::DEBUG_SERVER;
         
         // Recipients
         $hotel_name = $settings['hotel_name'] ?? 'L.P.S.T Hotel';
@@ -418,45 +428,48 @@ function test_email_configuration($test_email, $pdo, $admin_id) {
             throw new Exception('SMTP configuration is incomplete. Please configure all required settings first.');
         }
         
+        $subject = 'L.P.S.T Bookings - Email Configuration Test';
+        $body = "
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .header { background: #2563eb; color: white; padding: 15px; border-radius: 5px; text-align: center; }
+                .content { padding: 20px; background: #f8f9fa; border-radius: 5px; margin: 15px 0; }
+                .success { color: #28a745; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class='header'>
+                <h3>🎉 Email Configuration Test Successful!</h3>
+            </div>
+            <div class='content'>
+                <p class='success'>✅ Congratulations! Your email configuration is working correctly.</p>
+                <p><strong>Test Details:</strong></p>
+                <ul>
+                    <li>Test sent on: " . date('d-M-Y H:i:s') . "</li>
+                    <li>System: L.P.S.T Bookings</li>
+                    <li>Status: Email delivery successful</li>
+                    <li>SMTP Host: " . htmlspecialchars($settings['smtp_host']) . "</li>
+                    <li>SMTP Port: " . htmlspecialchars($settings['smtp_port']) . "</li>
+                    <li>Encryption: " . htmlspecialchars($settings['smtp_encryption']) . "</li>
+                </ul>
+                <p>You can now use the email export feature to send booking reports.</p>
+            </div>
+            <div style='text-align: center; color: #6c757d; font-size: 12px; margin-top: 20px;'>
+                This is an automated test email from L.P.S.T Bookings System.
+            </div>
+        </body>
+        </html>
+        ";
+        
+        return send_email($test_email, $subject, $body, null, null, $pdo, $admin_id);
+        
     } catch (Exception $e) {
         return [
             'success' => false,
             'message' => $e->getMessage()
         ];
     }
-    
-    $subject = 'L.P.S.T Bookings - Email Configuration Test';
-    $body = "
-    <html>
-    <head>
-        <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            .header { background: #2563eb; color: white; padding: 15px; border-radius: 5px; text-align: center; }
-            .content { padding: 20px; background: #f8f9fa; border-radius: 5px; margin: 15px 0; }
-            .success { color: #28a745; font-weight: bold; }
-        </style>
-    </head>
-    <body>
-        <div class='header'>
-            <h3>🎉 Email Configuration Test Successful!</h3>
-        </div>
-        <div class='content'>
-            <p class='success'>✅ Congratulations! Your email configuration is working correctly.</p>
-            <p><strong>Test Details:</strong></p>
-            <ul>
-                <li>Test sent on: " . date('d-M-Y H:i:s') . "</li>
-                <li>System: L.P.S.T Bookings</li>
-                <li>Status: Email delivery successful</li>
-            </ul>
-            <p>You can now use the email export feature to send booking reports.</p>
-        </div>
-        <div style='text-align: center; color: #6c757d; font-size: 12px; margin-top: 20px;'>
-            This is an automated test email from L.P.S.T Bookings System.
-        </div>
-    </body>
-    </html>
-    ";
-    
-    return send_email($test_email, $subject, $body, null, null, $pdo, $admin_id);
 }
 ?>

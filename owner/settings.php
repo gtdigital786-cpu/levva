@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if (empty($smtpHost) || empty($smtpUsername)) {
                     $error = 'SMTP Host and Username are required';
-                } elseif (empty($smtpPassword) && empty($settings['smtp_password'] ?? '')) {
+                } elseif (empty($smtpPassword) && empty(($settings['smtp_password'] ?? ''))) {
                     $error = 'SMTP Password is required for first-time setup';
                 } else {
                     try {
@@ -157,10 +157,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if ($result['success']) {
                             redirect_with_message('settings.php', 'Test email sent successfully!', 'success');
                         } else {
-                            $error = 'Email test failed: ' . $result['message'];
+                            redirect_with_message('settings.php', 'Email test failed: ' . $result['message'], 'error');
                         }
                     } catch (Exception $e) {
-                        $error = 'Email test error: ' . $e->getMessage();
+                        redirect_with_message('settings.php', 'Email test error: ' . $e->getMessage(), 'error');
                     }
                 }
                 break;
@@ -366,7 +366,6 @@ $flash = get_flash_message();
                 <div class="form-group">
                     <label for="smtp_password" class="form-label">SMTP Password *</label>
                     <input type="password" id="smtp_password" name="smtp_password" class="form-control"
-                           value=""
                            placeholder="Your email password or app password">
                     <small style="color: var(--dark-color); font-size: 0.9rem;">
                         For Gmail, use App Password instead of regular password. Leave blank to keep current password.
@@ -379,6 +378,7 @@ $flash = get_flash_message();
                         <select id="smtp_encryption" name="smtp_encryption" class="form-control">
                             <option value="tls" <?= ($settings['smtp_encryption'] ?? 'tls') === 'tls' ? 'selected' : '' ?>>TLS</option>
                             <option value="ssl" <?= ($settings['smtp_encryption'] ?? '') === 'ssl' ? 'selected' : '' ?>>SSL</option>
+                            <option value="none" <?= ($settings['smtp_encryption'] ?? '') === 'none' ? 'selected' : '' ?>>None</option>
                         </select>
                     </div>
                     
@@ -396,13 +396,19 @@ $flash = get_flash_message();
             <!-- Test Email -->
             <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
                 <h4>Test Email Configuration</h4>
+                <div style="background: rgba(37, 99, 235, 0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <p style="color: var(--primary-color); margin: 0; font-size: 0.9rem;">
+                        <strong>Note:</strong> Make sure to save your SMTP settings first before testing. 
+                        The test will use your current saved configuration.
+                    </p>
+                </div>
                 <form method="POST" style="display: flex; gap: 1rem; align-items: end;">
                     <input type="hidden" name="csrf_token" value="<?= generate_csrf_token() ?>">
                     <input type="hidden" name="action" value="test_email">
                     <div class="form-group" style="margin: 0; flex: 1;">
                         <label for="test_email" class="form-label">Test Email Address</label>
                         <input type="email" id="test_email" name="test_email" class="form-control"
-                               placeholder="test@example.com">
+                               placeholder="test@example.com" required>
                     </div>
                     <button type="submit" class="btn btn-warning">Send Test Email</button>
                 </form>

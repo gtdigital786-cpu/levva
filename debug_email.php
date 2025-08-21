@@ -66,7 +66,11 @@ try {
         require_once __DIR__ . '/vendor/autoload.php';
         echo "<p>✅ PHPMailer loaded successfully</p>";
     } else {
-        echo "<p>⚠️ PHPMailer not available - will use PHP mail() function</p>";
+        echo "<p>⚠️ PHPMailer not available - will use PHP mail() function as fallback</p>";
+        echo "<p style='background: #fff3cd; padding: 10px; border-radius: 5px; color: #856404;'>";
+        echo "<strong>Recommendation:</strong> Install PHPMailer for better email delivery:<br>";
+        echo "<code>composer require phpmailer/phpmailer</code>";
+        echo "</p>";
     }
     
     // Check if all required settings are present
@@ -82,10 +86,41 @@ try {
         echo "<p style='color: red;'>❌ Missing required settings: " . implode(', ', $missing) . "</p>";
     } else {
         echo "<p style='color: green;'>✅ All required email settings are configured</p>";
+        
+        // Test SMTP connection
+        echo "<h3>Testing SMTP Connection:</h3>";
+        try {
+            if (function_exists('fsockopen')) {
+                $host = $settings['smtp_host'];
+                $port = $settings['smtp_port'] ?? 587;
+                $timeout = 10;
+                
+                $connection = @fsockopen($host, $port, $errno, $errstr, $timeout);
+                if ($connection) {
+                    echo "<p style='color: green;'>✅ SMTP server connection successful ($host:$port)</p>";
+                    fclose($connection);
+                } else {
+                    echo "<p style='color: red;'>❌ Cannot connect to SMTP server ($host:$port) - Error: $errstr</p>";
+                }
+            } else {
+                echo "<p style='color: orange;'>⚠️ Cannot test SMTP connection - fsockopen function not available</p>";
+            }
+        } catch (Exception $e) {
+            echo "<p style='color: red;'>❌ SMTP connection test failed: " . htmlspecialchars($e->getMessage()) . "</p>";
+        }
     }
+    
+    // Show current PHP mail configuration
+    echo "<h3>PHP Mail Configuration:</h3>";
+    echo "<ul>";
+    echo "<li>sendmail_path: " . (ini_get('sendmail_path') ?: 'Not set') . "</li>";
+    echo "<li>SMTP (Windows): " . (ini_get('SMTP') ?: 'Not set') . "</li>";
+    echo "<li>smtp_port (Windows): " . (ini_get('smtp_port') ?: 'Not set') . "</li>";
+    echo "</ul>";
     
     echo "<hr>";
     echo "<p><a href='owner/settings.php'>Go to Settings</a></p>";
+    echo "<p><a href='owner/settings.php#test-email'>Test Email Configuration</a></p>";
     
 } catch (Exception $e) {
     echo "<p style='color: red;'>❌ Error: " . htmlspecialchars($e->getMessage()) . "</p>";
